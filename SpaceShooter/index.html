@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+   
+<head>
+   <title>Star Wars Space Shooter</title>
+   <script src="animacao.js"></script>
+   <script src="teclado.js"></script>
+   <script src="colisor.js"></script>
+   <script src="fundo.js"></script>
+   <script src="nave.js"></script>
+   <script src="ovni.js"></script>
+   <script src="tiro.js"></script>
+   <script src="spritesheet.js"></script>
+   <script src="explosao.js"></script>
+   <script src="painel.js"></script>
+   <style>
+   #link_jogar {
+      /* Inicia oculto */
+      display: none;
+   
+      /* Cores e fundo */
+      color: black;
+      background: url(img/botao-jogar.png);
+         
+      /* Fonte */
+      font-size: 20px;
+      font-family: sans-serif;
+      
+      /* Sem sublinhado e com sombra */
+      text-decoration: none;
+      text-shadow: 2px 2px 5px black;
+         
+      /* Posicionamento */
+      position: absolute;
+      left: 220px;
+      top: 330px;
+
+      /* A imagem do botão é 72x72, descontamos os paddings */
+      width: 52px;
+      height: 26px;
+      padding: 23px 10px;
+      
+      
+   }
+   </style>
+</head>
+
+<body>
+   <canvas id="canvas_animacao" width="500" height="620"></canvas>
+   
+   <a id="link_jogar" href="javascript: iniciarJogo()"></a>
+   
+   <script>
+      let lastPontuation = 0;
+      // Canvas e Context
+      var canvas = document.getElementById('canvas_animacao');
+      var context = canvas.getContext('2d');
+
+      // Variáveis principais
+      var imagens, animacao, teclado, colisor, nave, criadorInimigos;
+      var totalImagens = 0, carregadas = 0;
+      var musicaAcao;
+      
+      // Começa carregando as imagens e músicas
+      carregarImagens();
+      carregarMusicas();
+         
+      function carregarImagens() {
+         // Objeto contendo os nomes das imagens
+         imagens = {
+            espaco:   'fundo-espaco.png', 
+            estrelas: 'fundo-estrelas.png', 
+            nuvens:   'fundo-nuvens.png', 
+            nave:     'nave-spritesheet.png', 
+            ovni:     'ovni.png',
+            explosao: 'explosao.png'
+            
+         };
+         
+         
+         // Carregar todas
+         for (var i in imagens) {
+            var img = new Image();
+            img.src = 'img/' + imagens[i];
+            img.onload = carregando;
+            totalImagens++;
+            
+            // Substituir o nome pela imagem
+            imagens[i] = img;
+         }
+      }
+      
+      function carregando() {
+         context.save();
+         
+         // Fundo 
+         context.drawImage(imagens.espaco, 0, 0, canvas.width,
+                           canvas.height);
+         
+         // Nome do jogo"
+         context.fillStyle = 'yellow';
+         context.font = '100px times neue roman';
+         context.fillText("Star Wars", 60, 200);
+         context.strokeText("Star Wars", 60, 200);
+
+         context.fillStyle = 'yellow';
+         context.font = '50px times neue roman';
+         context.fillText("Space Shooter", 115, 250);
+         context.strokeText("Space Shooter", 115, 250);
+         
+         // Barra de loading
+         carregadas++;
+         var tamanhoTotal = 300;
+         var tamanho = carregadas / totalImagens * tamanhoTotal;
+         context.fillStyle = 'white';
+         //context.fillRect(100, 250, tamanho, 20);
+         
+         //Texto sobre o game
+         context.fillStyle = 'yellow';
+         context.font = '20px times neue roman';
+         context.fillText("Derrote as naves inimigas para acumular pontos", 60, 500);
+
+         
+         
+         
+         context.restore();         
+         
+         if (carregadas == totalImagens) {
+            iniciarObjetos();
+            mostrarLinkJogar();
+         }
+      }
+      
+      function iniciarObjetos() {
+         // Objetos principais
+         animacao = new Animacao(context);
+         teclado = new Teclado(document);
+         colisor = new Colisor();
+         espaco = new Fundo(context, imagens.espaco);
+         estrelas = new Fundo(context, imagens.estrelas);
+         nuvens = new Fundo(context, imagens.nuvens);
+         nave = new Nave(context, teclado, imagens.nave, imagens.explosao);
+         painel = new Painel(context, nave);
+         
+         // Ligações entre objetos
+         animacao.novoSprite(espaco);
+         animacao.novoSprite(estrelas);
+         //animacao.novoSprite(nuvens);
+         animacao.novoSprite(painel);
+         animacao.novoSprite(nave);
+         
+         colisor.novoSprite(nave);
+         animacao.novoProcessamento(colisor);
+         
+         configuracoesIniciais();
+      }
+      
+      function configuracoesIniciais() {
+         // Fundos
+         espaco.velocidade = 60;
+         estrelas.velocidade = 150;
+         nuvens.velocidade = 500;
+         
+         // Nave
+         nave.posicionar();
+         nave.velocidade = 250;
+         
+         // Inimigos
+         criacaoInimigos();
+         
+         // Game Over
+         nave.acabaramVidas = function() {
+            animacao.desligar();
+            lastPontuation = painel.pontuacao;
+            gameOver();
+            painel.pontuacao = 0; 
+         }
+         
+         // Pontuação
+         colisor.aoColidir = function(o1, o2) {
+            // Tiro com Ovni
+             if ( (o1 instanceof Tiro && o2 instanceof Ovni) ||
+                 (o1 instanceof Ovni && o2 instanceof Tiro) )
+               painel.pontuacao += 5;
+         }
+      }
+      
+      function criacaoInimigos() {
+         criadorInimigos = {
+            ultimoOvni: new Date().getTime(),
+            
+            processar: function() {
+               var agora = new Date().getTime();
+               var decorrido = agora - this.ultimoOvni;
+               
+               if (decorrido > (1000 - painel.pontuacao )) {
+                  novoOvni();
+                  this.ultimoOvni = agora;
+                  console.log(painel.pontuacao)
+               }
+            }
+         }
+         
+         animacao.novoProcessamento(criadorInimigos);
+      }
+      
+      function novoOvni() {
+         var imgOvni = imagens.ovni;
+         var ovni = new Ovni(context, imgOvni, imagens.explosao);
+
+         // Mínimo: 500; máximo: 1000
+         ovni.velocidade = 
+            Math.floor( 500 + Math.random() * (500 - 500 + 1) );
+         
+         // Mínimo: 0; máximo: largura do canvas - largura do ovni   
+         ovni.x = 
+            Math.floor(Math.random() * 
+                       (canvas.width - imgOvni.width + 1) );
+                  
+         // Descontar a altura
+         ovni.y = -imgOvni.height;
+         
+         animacao.novoSprite(ovni);
+         colisor.novoSprite(ovni);
+      }
+      
+      function pausarJogo() {
+         if (animacao.ligado) {
+            animacao.desligar();
+            ativarTiro(false);
+            context.save();
+            context.fillStyle = 'green';
+            //context.strokeStyle = 'black';
+            context.font = '60px times neue roman';
+            context.fillText("Pausado", 160, 200);
+            context.strokeText("Pausado", 160, 200);
+            context.restore();
+            musicaAcao.pause();
+         }
+         else {
+            criadorInimigos.ultimoOvni = new Date().getTime();
+            animacao.ligar();
+            ativarTiro(true);
+            musicaAcao.play();
+         }
+      }
+      
+      function ativarTiro(ativar) {
+         if (ativar) {
+            teclado.disparou(ESPACO, function() {
+               nave.atirar();
+            });
+         }
+         else
+            teclado.disparou(ESPACO, null);
+      }
+      
+      function carregarMusicas() {
+         musicaAcao = new Audio();
+         musicaAcao.src = 'snd/Orbital Colossus.mp3';
+         musicaAcao.volume = 0.3;
+         musicaAcao.loop = true;
+         musicaAcao.load();
+      }
+      
+      function mostrarLinkJogar() {
+         document.getElementById('link_jogar').style.display =
+            'block';
+      }
+      
+      function iniciarJogo() {
+         criadorInimigos.ultimoOvni = new Date().getTime();
+      
+         // Tiro
+         ativarTiro(true);
+         
+         // Pausa
+         teclado.disparou(ENTER, pausarJogo);
+         
+         document.getElementById('link_jogar').style.display =
+            'none';
+         musicaAcao.play();
+         animacao.ligar();
+      }
+      
+      function gameOver() {
+
+
+
+       // Tiro
+         ativarTiro(false);
+         
+         // Pausa
+         teclado.disparou(ENTER, null);
+         
+         // Parar a música e rebobinar
+         musicaAcao.pause();
+         musicaAcao.currentTime = 0.0;
+         
+         // Fundo
+         context.drawImage(imagens.espaco, 0, 0, canvas.width,
+                           canvas.height);
+         
+         // Texto "Game Over"
+         context.save();
+         context.fillStyle = 'red';
+        // context.strokeStyle = 'black';
+         context.font = '75px times neue roman';
+         context.fillText("GAME OVER", 40, 200);
+         context.strokeText("GAME OVER", 40, 200);
+
+         context.fillStyle = 'yellow';
+         context.font = '30px times neue roman';
+         context.fillText("Pontuação: " + lastPontuation, 170, 500);
+         context.strokeText("Pontuação:", 10, 300);
+         
+         
+       
+
+         context.restore();
+         
+         // Volta o link "Jogar"
+         mostrarLinkJogar();
+         
+         // Restaurar as condições da nave
+         nave.vidasExtras = 3;
+         nave.posicionar();
+         animacao.novoSprite(nave);
+         colisor.novoSprite(nave);
+
+      
+         
+         // Tirar todos os inimigos da tela
+         removerInimigos();
+         
+         
+         
+      }
+      
+      function removerInimigos() {
+         for (var i in animacao.sprites) {
+            if (animacao.sprites[i] instanceof Ovni)
+               animacao.excluirSprite(animacao.sprites[i]);
+         }
+      }
+
+      var pontuacoes = [];
+   </script>
+</body>
+
+</html>
