@@ -106,7 +106,7 @@ section
 }
 .home-content h3
 {
-    font-size: 4rem;
+    font-size: 3.5rem;
     margin: 1rem 0;
 }
 .home-content p
@@ -601,4 +601,35 @@ section
 
 .project-video iframe:hover {
     box-shadow: 0 0 25px rgba(0, 225, 255, 0.5);
+}
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+.resume-link {
+  cursor: pointer;
+  color: white;
+  text-decoration: none;
+}
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #222;
+  min-width: 180px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  z-index: 1;
+  border-radius: 8px;
+}
+.dropdown-content a {
+  color: white;
+  padding: 10px 15px;
+  text-decoration: none;
+  display: block;
+}
+.dropdown-content a:hover {
+  background-color: #444;
+}
+.dropdown:hover .dropdown-content {
+  display: block;
 }
